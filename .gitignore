@@ -1,0 +1,10 @@
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.idea/
+.vscode/
+
+# Local test scripts
+run_locally.sh

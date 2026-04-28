@@ -1,0 +1,60 @@
+#
+# Copyright 2025 ABSA Group Limited
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Example: Scheduled certificate health check
+#
+# Runs every Monday at 06:00 UTC and validates all .crt and .pem files
+# found under a deployment/certs directory.
+#
+# To use: copy this file to .github/workflows/ in your repository and
+# adjust the cert discovery path and warning_days to match your setup.
+
+name: Validate Certificates
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # every Monday at 06:00 UTC
+  workflow_dispatch:        # allow manual triggering
+
+jobs:
+  find-certs:
+    name: Find Certificates
+    runs-on: ubuntu-latest
+    outputs:
+      certs: ${{ steps.set-certificates.outputs.certs }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find all .crt and .pem certificate files
+        id: set-certificates
+        run: |
+          certs=$(find ./deployment/certs \
+            -type f \( -name "*.crt" -o -name "*.pem" \) \
+            | jq -R -s -c 'split("\n")[:-1]')
+          echo "certs=$certs" >> $GITHUB_OUTPUT
+
+  validate-certificates:
+    name: Validate Certificates
+    needs: find-certs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate all deployment certificates
+        uses: AbsaOSS/validate-certificates@v1
+        with:
+          certificates: ${{ needs.find-certs.outputs.certs }}
+          warning_days: '60'
