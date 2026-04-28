@@ -139,4 +139,4 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 
 ## License
 
-Copyright 2025 ABSA Group Limited — licensed under the [Apache License 2.0](LICENSE).
+Copyright 2026 ABSA Group Limited — licensed under the [Apache License 2.0](LICENSE).
