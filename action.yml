@@ -15,7 +15,7 @@
 #
 
 name: 'Validate Certificates'
-description: 'Validate multiple SSL/TLS certificates from a JSON array and summarize results. Groups certificates by subject so that expired certs with a newer valid replacement do not fail the check.'
+description: 'Validate multiple SSL/TLS certificates from a JSON array and summarize results with subject-grouped expiry detection.'
 
 inputs:
   certificates:
