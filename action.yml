@@ -52,7 +52,7 @@ runs:
         fi
         
         CERTIFICATES="$INPUT_CERTIFICATES"
-        WARNING_DAYS="$INPUT_WARNING_DAYS"
+        WARNING_DAYS=$((10#$INPUT_WARNING_DAYS))
 
         # Parse JSON array into a bash array
         mapfile -t CERT_FILES < <(echo "$CERTIFICATES" | jq -r '.[]')
