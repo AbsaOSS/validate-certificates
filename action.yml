@@ -51,8 +51,8 @@ runs:
           exit 1
         fi
         
-        CERTIFICATES='${{ INPUT_CERTIFICATES }}'
-        WARNING_DAYS="${{ INPUT_WARNING_DAYS }}"
+        CERTIFICATES="$INPUT_CERTIFICATES"
+        WARNING_DAYS="$INPUT_WARNING_DAYS"
 
         # Parse JSON array into a bash array
         mapfile -t CERT_FILES < <(echo "$CERTIFICATES" | jq -r '.[]')
