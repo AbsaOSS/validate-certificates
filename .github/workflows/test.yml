@@ -1,0 +1,223 @@
+#
+# Copyright 2026 ABSA Group Limited
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+name: Test
+
+on:
+  pull_request:
+    branches: [ master ]
+  push:
+    branches: [ master ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Generate test fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FIXTURES_DIR="tests/fixtures"
+          CA_DIR="$(pwd)/$FIXTURES_DIR/ca"
+          mkdir -p "$CA_DIR/newcerts"
+          touch "$CA_DIR/index.txt"
+          echo "1000" > "$CA_DIR/serial"
+
+          cat > "$CA_DIR/openssl.cnf" << EOF
+          [ca]
+          default_ca = test_ca
+          [test_ca]
+          dir              = ${CA_DIR}
+          database         = \$dir/index.txt
+          new_certs_dir    = \$dir/newcerts
+          serial           = \$dir/serial
+          certificate      = \$dir/ca.pem
+          private_key      = \$dir/ca.key
+          default_md       = sha256
+          policy           = policy_any
+          unique_subject   = no
+          [policy_any]
+          commonName = supplied
+          [req]
+          distinguished_name = req_dn
+          prompt             = no
+          [req_dn]
+          EOF
+
+          openssl req -x509 -newkey rsa:2048 -keyout "$CA_DIR/ca.key" -out "$CA_DIR/ca.pem" \
+            -days 7300 -nodes -subj "/CN=Test CA" 2>/dev/null
+
+          sign_cert() {
+            local out="$1" cn="$2" startdate="$3" enddate="$4"
+            local tmpkey tmpcsr
+            tmpkey=$(mktemp)
+            tmpcsr=$(mktemp)
+            openssl req -newkey rsa:2048 -keyout "$tmpkey" -out "$tmpcsr" \
+              -nodes -subj "/CN=$cn" 2>/dev/null
+            openssl ca -batch -config "$CA_DIR/openssl.cnf" \
+              -startdate "$startdate" -enddate "$enddate" \
+              -in "$tmpcsr" -out "$out" -notext 2>/dev/null
+            rm -f "$tmpkey" "$tmpcsr"
+          }
+
+          YEAR=$(date -u +%Y)
+          YY_2AGO=$(printf "%02d" $(( (YEAR - 2) % 100 )))
+          YY_1AGO=$(printf "%02d" $(( (YEAR - 1) % 100 )))
+          YY_1AHEAD=$(printf "%02d" $(( (YEAR + 1) % 100 )))
+          YY_2AHEAD=$(printf "%02d" $(( (YEAR + 2) % 100 )))
+
+          openssl req -x509 -newkey rsa:2048 -keyout /dev/null \
+            -out "$FIXTURES_DIR/valid.pem" -days 365 -nodes \
+            -subj "/CN=valid.example.com" 2>/dev/null
+
+          openssl req -x509 -newkey rsa:2048 -keyout /dev/null \
+            -out "$FIXTURES_DIR/expiring.pem" -days 10 -nodes \
+            -subj "/CN=expiring.example.com" 2>/dev/null
+
+          sign_cert "$FIXTURES_DIR/expired.pem" "expired.example.com" \
+            "${YY_2AGO}0101000000Z" "${YY_1AGO}0101000000Z"
+
+          sign_cert "$FIXTURES_DIR/not_yet_valid.pem" "notyetvalid.example.com" \
+            "${YY_1AHEAD}0101000000Z" "${YY_2AHEAD}0101000000Z"
+
+          sign_cert "$FIXTURES_DIR/multi_expired.pem" "multi.example.com" \
+            "${YY_2AGO}0101000000Z" "${YY_1AGO}0101000000Z"
+
+          openssl req -x509 -newkey rsa:2048 -keyout /dev/null \
+            -out "$FIXTURES_DIR/multi_valid.pem" -days 365 -nodes \
+            -subj "/CN=multi.example.com" 2>/dev/null
+
+          echo "Fixtures generated:"
+          ls -la "$FIXTURES_DIR"/*.pem
+
+      # ── valid certificate ──────────────────────────────────────
+      - name: Reset step summary
+        shell: bash
+        run: : > "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Test: valid certificate'
+        uses: ./
+        with:
+          certificates: '["tests/fixtures/valid.pem"]'
+
+      - name: 'Assert: valid certificate'
+        shell: bash
+        run: grep -q "✅ Valid" "$GITHUB_STEP_SUMMARY"
+
+      # ── expiring-soon certificate ──────────────────────────────
+      - name: Reset step summary
+        shell: bash
+        run: : > "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Test: expiring-soon certificate'
+        uses: ./
+        with:
+          certificates: '["tests/fixtures/expiring.pem"]'
+
+      - name: 'Assert: expiring-soon certificate'
+        shell: bash
+        run: grep -q "Expiring Soon" "$GITHUB_STEP_SUMMARY"
+
+      # ── expired certificate ────────────────────────────────────
+      - name: Reset step summary
+        shell: bash
+        run: : > "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Test: expired certificate'
+        id: test-expired
+        uses: ./
+        with:
+          certificates: '["tests/fixtures/expired.pem"]'
+        continue-on-error: true
+
+      - name: 'Assert: expired certificate'
+        shell: bash
+        run: |
+          if [[ "${{ steps.test-expired.outcome }}" != "failure" ]]; then
+            echo "::error::Expected action to fail for expired certificate"
+            exit 1
+          fi
+          grep -q "Expired" "$GITHUB_STEP_SUMMARY"
+
+      # ── not-yet-valid certificate ──────────────────────────────
+      - name: Reset step summary
+        shell: bash
+        run: : > "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Test: not-yet-valid certificate'
+        id: test-not-yet-valid
+        uses: ./
+        with:
+          certificates: '["tests/fixtures/not_yet_valid.pem"]'
+        continue-on-error: true
+
+      - name: 'Assert: not-yet-valid certificate'
+        shell: bash
+        run: |
+          if [[ "${{ steps.test-not-yet-valid.outcome }}" != "failure" ]]; then
+            echo "::error::Expected action to fail for not-yet-valid certificate"
+            exit 1
+          fi
+          grep -q "Failed" "$GITHUB_STEP_SUMMARY"
+
+      # ── missing file ───────────────────────────────────────────
+      - name: Reset step summary
+        shell: bash
+        run: : > "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Test: missing file'
+        id: test-missing
+        uses: ./
+        with:
+          certificates: '["/nonexistent/cert.pem"]'
+        continue-on-error: true
+
+      - name: 'Assert: missing file'
+        shell: bash
+        run: |
+          if [[ "${{ steps.test-missing.outcome }}" != "failure" ]]; then
+            echo "::error::Expected action to fail for missing file"
+            exit 1
+          fi
+          grep -q "Failed" "$GITHUB_STEP_SUMMARY"
+
+      # ── multi-cert with valid replacement ──────────────────────
+      - name: Reset step summary
+        shell: bash
+        run: : > "$GITHUB_STEP_SUMMARY"
+
+      - name: 'Test: multi-cert with valid replacement'
+        uses: ./
+        with:
+          certificates: '["tests/fixtures/multi_expired.pem", "tests/fixtures/multi_valid.pem"]'
+
+      - name: 'Assert: multi-cert with valid replacement'
+        shell: bash
+        run: grep -q "newer replacement exists" "$GITHUB_STEP_SUMMARY"

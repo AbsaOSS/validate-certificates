@@ -8,3 +8,6 @@ Thumbs.db
 
 # Local test scripts
 run_locally.sh
+
+# Generated test fixtures
+tests/fixtures/
