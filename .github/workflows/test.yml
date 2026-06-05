@@ -39,6 +39,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # Action uses bash 4+ features (mapfile, associative arrays).
+      # macOS runners ship bash 3.2 — install a modern version via Homebrew.
+      - name: Install bash (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bash
+
       - name: Generate test fixtures
         shell: bash
         run: |
