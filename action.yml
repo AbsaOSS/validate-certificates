@@ -26,7 +26,7 @@ inputs:
     required: false
     default: '30'
   fail_on_warn:
-    description: 'Whether to fail the action if any certificate is nearing expiry (true/false)'
+    description: 'Whether to fail the action if any certificate(s) is nearing expiry (true/false)'
     required: false
     default: 'false'
 
@@ -305,6 +305,11 @@ runs:
           else
             echo "> ✅ **All certificate(s) are valid (or have valid replacements).**"
           fi
+          echo ""
+          echo "| Metric | Count |"
+          echo "|--------|-------|"
+          echo "| Failed | $FAIL_COUNT |"
+          echo "| Warnings | $WARN_COUNT |"
         } >> "$GITHUB_STEP_SUMMARY"
 
         # -------------------------------------------------------
@@ -343,3 +348,5 @@ runs:
           echo "✅ All certificate(s) are valid (or have valid replacements)."
           exit 0
         fi
+
+
