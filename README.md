@@ -27,15 +27,23 @@ Certificates are **grouped by subject**, so an expired cert with a newer valid r
 |----------------|----------|---------|---------------------------------------------------------|
 | `certificates` | ✅       | —       | JSON array of certificate file paths to validate        |
 | `warning_days` | ❌       | `30`    | Days before expiry to emit a warning instead of passing |
+| `fail_on_warn` | ❌       | `false` | Fail the job (exit 1) when any certificate is nearing expiry |
 
 ---
 
 ## Outputs
 
-- Per-certificate validation details printed to the job log
-- A Markdown summary table written to the **GitHub Step Summary** panel
+| Output       | Description                                                            |
+|--------------|------------------------------------------------------------------------|
+| `result`     | Overall validation result: `pass`, `warn`, or `fail`                   |
+| `fail_count` | Number of certificates that failed validation with no valid replacement |
+| `warn_count` | Number of certificates nearing expiry with no newer replacement        |
+
+The action also writes:
+- Per-certificate validation details to the job log
+- A Markdown summary table to the **GitHub Step Summary** panel
 - Exits **1** if any certificate is expired, not yet valid, or cannot be parsed and has no valid replacement
-- Exits **0** (with warnings) if all certs are valid but some are nearing expiry
+- Exits **0** (with warnings) if all certs are valid but some are nearing expiry (unless `fail_on_warn: true`)
 
 ---
 
@@ -119,6 +127,48 @@ jobs:
               "./certs/legacy.example.com.crt"
             ]
           warning_days: '45'
+```
+
+### Using outputs for conditional workflows
+
+```yaml
+jobs:
+  validate-certs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate certificates
+        id: cert-check
+        uses: AbsaOSS/validate-certificates@v1
+        with:
+          certificates: '["./certs/server.crt", "./certs/client.pem"]'
+          warning_days: '30'
+
+      - name: Send Slack alert on warnings or failures
+        if: steps.cert-check.outputs.result != 'pass'
+        run: |
+          echo "Certificate validation result: ${{ steps.cert-check.outputs.result }}"
+          echo "Failures: ${{ steps.cert-check.outputs.fail_count }}"
+          echo "Warnings: ${{ steps.cert-check.outputs.warn_count }}"
+          # Add your Slack webhook or notification logic here
+
+      - name: Open ticket on failures only
+        if: steps.cert-check.outputs.fail_count > 0
+        run: |
+          echo "Creating incident ticket for ${{ steps.cert-check.outputs.fail_count }} failed certificate(s)"
+          # Add your ticketing system integration here
+```
+
+### Enforcing strict certificate hygiene
+
+```yaml
+- name: Validate certificates with strict policy
+  uses: AbsaOSS/validate-certificates@v1
+  with:
+    certificates: '["./certs/production.crt"]'
+    warning_days: '60'
+    fail_on_warn: 'true'  # Fail the job if cert expires within 60 days
 ```
 
 See the [`examples/`](examples/) directory for ready-to-use workflow files.

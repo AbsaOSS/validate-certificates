@@ -25,6 +25,21 @@ inputs:
     description: 'Number of days before expiration to show warning'
     required: false
     default: '30'
+  fail_on_warn:
+    description: 'Whether to fail the action if any certificate is nearing expiry (true/false)'
+    required: false
+    default: 'false'
+
+outputs:
+  result:
+    description: 'Overall validation result: pass, warn, or fail'
+    value: ${{ steps.validate.outputs.result }}
+  fail_count:
+    description: 'Number of certificates that failed validation with no valid replacement'
+    value: ${{ steps.validate.outputs.fail_count }}
+  warn_count:
+    description: 'Number of certificates nearing expiry with no newer replacement'
+    value: ${{ steps.validate.outputs.warn_count }}
 
 branding:
   icon: 'shield'
@@ -34,9 +49,11 @@ runs:
   using: "composite"
   steps:
     - name: Validate certificates
+      id: validate
       env:
         INPUT_CERTIFICATES: ${{ inputs.certificates }}
         INPUT_WARNING_DAYS: ${{ inputs.warning_days }}
+        INPUT_FAIL_ON_WARN: ${{ inputs.fail_on_warn }}
       shell: bash
       run: |
         set -uo pipefail
@@ -289,6 +306,29 @@ runs:
             echo "> ✅ **All certificate(s) are valid (or have valid replacements).**"
           fi
         } >> "$GITHUB_STEP_SUMMARY"
+
+        # -------------------------------------------------------
+        # Emit outputs for programmatic use
+        # -------------------------------------------------------
+        if [[ $FAIL_COUNT -gt 0 ]]; then
+          RESULT="fail"
+        elif [[ $WARN_COUNT -gt 0 ]]; then
+          RESULT="warn"
+        else
+          RESULT="pass"
+        fi
+
+        echo "result=$RESULT" >> "$GITHUB_OUTPUT"
+        echo "fail_count=$FAIL_COUNT" >> "$GITHUB_OUTPUT"
+        echo "warn_count=$WARN_COUNT" >> "$GITHUB_OUTPUT"
+
+        # -------------------------------------------------------
+        # Enforce fail_on_warn if requested
+        # -------------------------------------------------------
+        if [[ "${INPUT_FAIL_ON_WARN}" == "true" && $WARN_COUNT -gt 0 ]]; then
+          echo "❌ fail_on_warn=true: $WARN_COUNT certificate(s) are nearing expiry. Failing the job."
+          exit 1
+        fi
 
         # -------------------------------------------------------
         # Final exit code
