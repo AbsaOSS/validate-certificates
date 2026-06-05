@@ -123,107 +123,83 @@ jobs:
           echo "Fixtures generated:"
           ls -la "$FIXTURES_DIR"/*.pem
 
-      # ── valid certificate ──────────────────────────────────────
-      - name: Reset step summary
-        shell: bash
-        run: echo -n > "$GITHUB_STEP_SUMMARY"
-
       - name: 'Test: valid certificate'
-        uses: ./
-        with:
-          certificates: '["tests/fixtures/valid.pem"]'
-
-      - name: 'Assert: valid certificate'
         shell: bash
-        run: grep -q "✅ Valid" "$GITHUB_STEP_SUMMARY"
-
-      # ── expiring-soon certificate ──────────────────────────────
-      - name: Reset step summary
-        shell: bash
-        run: echo -n > "$GITHUB_STEP_SUMMARY"
+        run: |
+          SUMMARY=$(mktemp)
+          INPUT_CERTIFICATES='["tests/fixtures/valid.pem"]' \
+          INPUT_WARNING_DAYS=30 \
+          GITHUB_STEP_SUMMARY="$SUMMARY" \
+            bash validate.sh
+          grep -q "✅ Valid" "$SUMMARY"
+          rm -f "$SUMMARY"
 
       - name: 'Test: expiring-soon certificate'
-        uses: ./
-        with:
-          certificates: '["tests/fixtures/expiring.pem"]'
-
-      - name: 'Assert: expiring-soon certificate'
         shell: bash
-        run: grep -q "Expiring Soon" "$GITHUB_STEP_SUMMARY"
-
-      # ── expired certificate ────────────────────────────────────
-      - name: Reset step summary
-        shell: bash
-        run: echo -n > "$GITHUB_STEP_SUMMARY"
+        run: |
+          SUMMARY=$(mktemp)
+          INPUT_CERTIFICATES='["tests/fixtures/expiring.pem"]' \
+          INPUT_WARNING_DAYS=30 \
+          GITHUB_STEP_SUMMARY="$SUMMARY" \
+            bash validate.sh
+          grep -q "Expiring Soon" "$SUMMARY"
+          rm -f "$SUMMARY"
 
       - name: 'Test: expired certificate'
-        id: test-expired
-        uses: ./
-        with:
-          certificates: '["tests/fixtures/expired.pem"]'
-        continue-on-error: true
-
-      - name: 'Assert: expired certificate'
         shell: bash
         run: |
-          if [[ "${{ steps.test-expired.outcome }}" != "failure" ]]; then
-            echo "::error::Expected action to fail for expired certificate"
+          SUMMARY=$(mktemp)
+          EXIT=0
+          INPUT_CERTIFICATES='["tests/fixtures/expired.pem"]' \
+          INPUT_WARNING_DAYS=30 \
+          GITHUB_STEP_SUMMARY="$SUMMARY" \
+            bash validate.sh || EXIT=$?
+          if [[ "$EXIT" -ne 1 ]]; then
+            echo "::error::Expected exit code 1 for expired cert, got $EXIT"
             exit 1
           fi
-          grep -q "Expired" "$GITHUB_STEP_SUMMARY"
-
-      # ── not-yet-valid certificate ──────────────────────────────
-      - name: Reset step summary
-        shell: bash
-        run: echo -n > "$GITHUB_STEP_SUMMARY"
+          grep -q "Expired" "$SUMMARY"
+          rm -f "$SUMMARY"
 
       - name: 'Test: not-yet-valid certificate'
-        id: test-not-yet-valid
-        uses: ./
-        with:
-          certificates: '["tests/fixtures/not_yet_valid.pem"]'
-        continue-on-error: true
-
-      - name: 'Assert: not-yet-valid certificate'
         shell: bash
         run: |
-          if [[ "${{ steps.test-not-yet-valid.outcome }}" != "failure" ]]; then
-            echo "::error::Expected action to fail for not-yet-valid certificate"
+          SUMMARY=$(mktemp)
+          EXIT=0
+          INPUT_CERTIFICATES='["tests/fixtures/not_yet_valid.pem"]' \
+          INPUT_WARNING_DAYS=30 \
+          GITHUB_STEP_SUMMARY="$SUMMARY" \
+            bash validate.sh || EXIT=$?
+          if [[ "$EXIT" -ne 1 ]]; then
+            echo "::error::Expected exit code 1 for not-yet-valid cert, got $EXIT"
             exit 1
           fi
-          grep -q "Failed" "$GITHUB_STEP_SUMMARY"
-
-      # ── missing file ───────────────────────────────────────────
-      - name: Reset step summary
-        shell: bash
-        run: echo -n > "$GITHUB_STEP_SUMMARY"
+          grep -q "Failed" "$SUMMARY"
+          rm -f "$SUMMARY"
 
       - name: 'Test: missing file'
-        id: test-missing
-        uses: ./
-        with:
-          certificates: '["/nonexistent/cert.pem"]'
-        continue-on-error: true
-
-      - name: 'Assert: missing file'
         shell: bash
         run: |
-          if [[ "${{ steps.test-missing.outcome }}" != "failure" ]]; then
-            echo "::error::Expected action to fail for missing file"
+          SUMMARY=$(mktemp)
+          EXIT=0
+          INPUT_CERTIFICATES='["/nonexistent/cert.pem"]' \
+          INPUT_WARNING_DAYS=30 \
+          GITHUB_STEP_SUMMARY="$SUMMARY" \
+            bash validate.sh || EXIT=$?
+          if [[ "$EXIT" -ne 1 ]]; then
+            echo "::error::Expected exit code 1 for missing file, got $EXIT"
             exit 1
           fi
-          grep -q "Failed" "$GITHUB_STEP_SUMMARY"
-
-      # ── multi-cert with valid replacement ──────────────────────
-      - name: Reset step summary
-        shell: bash
-        run: echo -n > "$GITHUB_STEP_SUMMARY"
+          grep -q "Failed" "$SUMMARY"
+          rm -f "$SUMMARY"
 
       - name: 'Test: multi-cert with valid replacement'
-        uses: ./
-        with:
-          certificates: '["tests/fixtures/multi_expired.pem", "tests/fixtures/multi_valid.pem"]'
-
-      - name: 'Assert: multi-cert with valid replacement'
         shell: bash
-        run: grep -q "newer replacement exists" "$GITHUB_STEP_SUMMARY"
+        run: |
+          SUMMARY=$(mktemp)
+          INPUT_CERTIFICATES='["tests/fixtures/multi_expired.pem", "tests/fixtures/multi_valid.pem"]' \
+          INPUT_WARNING_DAYS=30 \
+          GITHUB_STEP_SUMMARY="$SUMMARY" \
+            bash validate.sh
+          grep -q "newer replacement exists" "$SUMMARY"
+          rm -f "$SUMMARY"
