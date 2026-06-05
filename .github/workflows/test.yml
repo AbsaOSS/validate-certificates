@@ -120,7 +120,7 @@ jobs:
       # ── valid certificate ──────────────────────────────────────
       - name: Reset step summary
         shell: bash
-        run: : > "$GITHUB_STEP_SUMMARY"
+        run: echo -n > "$GITHUB_STEP_SUMMARY"
 
       - name: 'Test: valid certificate'
         uses: ./
@@ -134,7 +134,7 @@ jobs:
       # ── expiring-soon certificate ──────────────────────────────
       - name: Reset step summary
         shell: bash
-        run: : > "$GITHUB_STEP_SUMMARY"
+        run: echo -n > "$GITHUB_STEP_SUMMARY"
 
       - name: 'Test: expiring-soon certificate'
         uses: ./
@@ -148,7 +148,7 @@ jobs:
       # ── expired certificate ────────────────────────────────────
       - name: Reset step summary
         shell: bash
-        run: : > "$GITHUB_STEP_SUMMARY"
+        run: echo -n > "$GITHUB_STEP_SUMMARY"
 
       - name: 'Test: expired certificate'
         id: test-expired
@@ -169,7 +169,7 @@ jobs:
       # ── not-yet-valid certificate ──────────────────────────────
       - name: Reset step summary
         shell: bash
-        run: : > "$GITHUB_STEP_SUMMARY"
+        run: echo -n > "$GITHUB_STEP_SUMMARY"
 
       - name: 'Test: not-yet-valid certificate'
         id: test-not-yet-valid
@@ -190,7 +190,7 @@ jobs:
       # ── missing file ───────────────────────────────────────────
       - name: Reset step summary
         shell: bash
-        run: : > "$GITHUB_STEP_SUMMARY"
+        run: echo -n > "$GITHUB_STEP_SUMMARY"
 
       - name: 'Test: missing file'
         id: test-missing
@@ -211,7 +211,7 @@ jobs:
       # ── multi-cert with valid replacement ──────────────────────
       - name: Reset step summary
         shell: bash
-        run: : > "$GITHUB_STEP_SUMMARY"
+        run: echo -n > "$GITHUB_STEP_SUMMARY"
 
       - name: 'Test: multi-cert with valid replacement'
         uses: ./
