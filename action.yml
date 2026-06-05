@@ -315,7 +315,13 @@ runs:
         # -------------------------------------------------------
         # Emit outputs for programmatic use
         # -------------------------------------------------------
-        if [[ $FAIL_COUNT -gt 0 ]]; then
+        FAIL_ON_WARN="${INPUT_FAIL_ON_WARN,,}"
+        if [[ "$FAIL_ON_WARN" != "true" && "$FAIL_ON_WARN" != "false" ]]; then
+          echo "::error::INPUT_FAIL_ON_WARN must be 'true' or 'false', got: '$INPUT_FAIL_ON_WARN'"
+          exit 1
+        fi
+
+        if [[ $FAIL_COUNT -gt 0 || ( "$FAIL_ON_WARN" == "true" && $WARN_COUNT -gt 0 ) ]]; then
           RESULT="fail"
         elif [[ $WARN_COUNT -gt 0 ]]; then
           RESULT="warn"
@@ -330,7 +336,7 @@ runs:
         # -------------------------------------------------------
         # Enforce fail_on_warn if requested
         # -------------------------------------------------------
-        if [[ "${INPUT_FAIL_ON_WARN}" == "true" && $WARN_COUNT -gt 0 ]]; then
+        if [[ "$FAIL_ON_WARN" == "true" && $WARN_COUNT -gt 0 ]]; then
           echo "❌ fail_on_warn=true: $WARN_COUNT certificate(s) are nearing expiry. Failing the job."
           exit 1
         fi
