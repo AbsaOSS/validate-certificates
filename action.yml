@@ -34,12 +34,25 @@ runs:
   using: "composite"
   steps:
     - name: Validate certificates
+      env:
+        INPUT_CERTIFICATES: ${{ inputs.certificates }}
+        INPUT_WARNING_DAYS: ${{ inputs.warning_days }}
       shell: bash
       run: |
         set -uo pipefail
-
-        CERTIFICATES='${{ inputs.certificates }}'
-        WARNING_DAYS="${{ inputs.warning_days }}"
+        
+        if [[ ! "$INPUT_WARNING_DAYS" =~ ^[0-9]+$ ]]; then
+          echo "::error::INPUT_WARNING_DAYS must be a non-negative integer, got: '$INPUT_WARNING_DAYS'"
+          exit 1
+        fi
+        
+        if ! echo "$INPUT_CERTIFICATES" | jq -e 'type == "array"' > /dev/null 2>&1; then
+          echo "::error::INPUT_CERTIFICATES must be a valid JSON array, got: '$INPUT_CERTIFICATES'"
+          exit 1
+        fi
+        
+        CERTIFICATES="$INPUT_CERTIFICATES"
+        WARNING_DAYS=$((10#$INPUT_WARNING_DAYS))
 
         # Parse JSON array into a bash array
         mapfile -t CERT_FILES < <(echo "$CERTIFICATES" | jq -r '.[]')
