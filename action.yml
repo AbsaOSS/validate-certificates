@@ -321,7 +321,6 @@ runs:
         # -------------------------------------------------------
         # Emit outputs for programmatic use
         # -------------------------------------------------------
-        
         if [[ $FAIL_COUNT -gt 0 || ( "$FAIL_ON_WARN" == "true" && $WARN_COUNT -gt 0 ) ]]; then
           RESULT="fail"
         elif [[ $WARN_COUNT -gt 0 ]]; then
