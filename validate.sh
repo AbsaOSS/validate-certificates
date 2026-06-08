@@ -19,7 +19,15 @@ set -uo pipefail
 
 INPUT_CERTIFICATES="${INPUT_CERTIFICATES:?'INPUT_CERTIFICATES environment variable is required'}"
 INPUT_WARNING_DAYS="${INPUT_WARNING_DAYS:-30}"
+INPUT_FAIL_ON_WARN="${INPUT_FAIL_ON_WARN:-false}"
 GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
+GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/null}"
+
+FAIL_ON_WARN="${INPUT_FAIL_ON_WARN,,}"
+if [[ "$FAIL_ON_WARN" != "true" && "$FAIL_ON_WARN" != "false" ]]; then
+  echo "::error::INPUT_FAIL_ON_WARN must be 'true' or 'false', got: '$INPUT_FAIL_ON_WARN'"
+  exit 1
+fi
 
 if [[ ! "$INPUT_WARNING_DAYS" =~ ^[0-9]+$ ]]; then
   echo "::error::INPUT_WARNING_DAYS must be a non-negative integer, got: '$INPUT_WARNING_DAYS'"
@@ -268,7 +276,35 @@ echo ""
   else
     echo "> ✅ **All certificate(s) are valid (or have valid replacements).**"
   fi
+  echo ""
+  echo "| Metric | Count |"
+  echo "|--------|-------|"
+  echo "| Failed | $FAIL_COUNT |"
+  echo "| Warnings | $WARN_COUNT |"
 } >> "$GITHUB_STEP_SUMMARY"
+
+# -------------------------------------------------------
+# Emit outputs for programmatic use
+# -------------------------------------------------------
+if [[ $FAIL_COUNT -gt 0 || ( "$FAIL_ON_WARN" == "true" && $WARN_COUNT -gt 0 ) ]]; then
+  RESULT="fail"
+elif [[ $WARN_COUNT -gt 0 ]]; then
+  RESULT="warn"
+else
+  RESULT="pass"
+fi
+
+echo "result=$RESULT" >> "$GITHUB_OUTPUT"
+echo "fail_count=$FAIL_COUNT" >> "$GITHUB_OUTPUT"
+echo "warn_count=$WARN_COUNT" >> "$GITHUB_OUTPUT"
+
+# -------------------------------------------------------
+# Enforce fail_on_warn if requested
+# -------------------------------------------------------
+if [[ "$FAIL_ON_WARN" == "true" && $WARN_COUNT -gt 0 ]]; then
+  echo "❌ fail_on_warn=true: $WARN_COUNT certificate(s) are nearing expiry. Failing the job."
+  exit 1
+fi
 
 # -------------------------------------------------------
 # Final exit code
