@@ -58,6 +58,12 @@ runs:
       run: |
         set -uo pipefail
         
+        FAIL_ON_WARN="${INPUT_FAIL_ON_WARN,,}"
+        if [[ "$FAIL_ON_WARN" != "true" && "$FAIL_ON_WARN" != "false" ]]; then
+          echo "::error::INPUT_FAIL_ON_WARN must be 'true' or 'false', got: '$INPUT_FAIL_ON_WARN'"
+          exit 1
+        fi
+        
         if [[ ! "$INPUT_WARNING_DAYS" =~ ^[0-9]+$ ]]; then
           echo "::error::INPUT_WARNING_DAYS must be a non-negative integer, got: '$INPUT_WARNING_DAYS'"
           exit 1
@@ -315,12 +321,7 @@ runs:
         # -------------------------------------------------------
         # Emit outputs for programmatic use
         # -------------------------------------------------------
-        FAIL_ON_WARN="${INPUT_FAIL_ON_WARN,,}"
-        if [[ "$FAIL_ON_WARN" != "true" && "$FAIL_ON_WARN" != "false" ]]; then
-          echo "::error::INPUT_FAIL_ON_WARN must be 'true' or 'false', got: '$INPUT_FAIL_ON_WARN'"
-          exit 1
-        fi
-
+        
         if [[ $FAIL_COUNT -gt 0 || ( "$FAIL_ON_WARN" == "true" && $WARN_COUNT -gt 0 ) ]]; then
           RESULT="fail"
         elif [[ $WARN_COUNT -gt 0 ]]; then
@@ -354,5 +355,3 @@ runs:
           echo "✅ All certificate(s) are valid (or have valid replacements)."
           exit 0
         fi
-
-
