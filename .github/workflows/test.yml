@@ -203,3 +203,64 @@ jobs:
             bash validate.sh
           grep -q "newer replacement exists" "$SUMMARY"
           rm -f "$SUMMARY"
+
+      - name: 'Test: fail_on_warn fails on expiring-soon certificate'
+        shell: bash
+        run: |
+          SUMMARY=$(mktemp)
+          EXIT=0
+          INPUT_CERTIFICATES='["tests/fixtures/expiring.pem"]' \
+          INPUT_WARNING_DAYS=30 \
+          INPUT_FAIL_ON_WARN=true \
+          GITHUB_STEP_SUMMARY="$SUMMARY" \
+            bash validate.sh || EXIT=$?
+          if [[ "$EXIT" -ne 1 ]]; then
+            echo "::error::Expected exit code 1 for fail_on_warn=true with expiring cert, got $EXIT"
+            exit 1
+          fi
+          grep -q "Expiring Soon" "$SUMMARY"
+          rm -f "$SUMMARY"
+
+      - name: 'Test: fail_on_warn does not fail valid certificate'
+        shell: bash
+        run: |
+          SUMMARY=$(mktemp)
+          INPUT_CERTIFICATES='["tests/fixtures/valid.pem"]' \
+          INPUT_WARNING_DAYS=30 \
+          INPUT_FAIL_ON_WARN=true \
+          GITHUB_STEP_SUMMARY="$SUMMARY" \
+            bash validate.sh
+          grep -q "✅ Valid" "$SUMMARY"
+          rm -f "$SUMMARY"
+
+      - name: 'Test: invalid JSON input'
+        shell: bash
+        run: |
+          OUTPUT=$(mktemp)
+          EXIT=0
+          INPUT_CERTIFICATES='not-valid-json' \
+          INPUT_WARNING_DAYS=30 \
+            bash validate.sh > "$OUTPUT" 2>&1 || EXIT=$?
+          if [[ "$EXIT" -ne 1 ]]; then
+            echo "::error::Expected exit code 1 for invalid JSON input, got $EXIT"
+            cat "$OUTPUT"
+            exit 1
+          fi
+          grep -q "must be a valid JSON array" "$OUTPUT"
+          rm -f "$OUTPUT"
+
+      - name: 'Test: valid JSON but not an array'
+        shell: bash
+        run: |
+          OUTPUT=$(mktemp)
+          EXIT=0
+          INPUT_CERTIFICATES='{"cert": "tests/fixtures/valid.pem"}' \
+          INPUT_WARNING_DAYS=30 \
+            bash validate.sh > "$OUTPUT" 2>&1 || EXIT=$?
+          if [[ "$EXIT" -ne 1 ]]; then
+            echo "::error::Expected exit code 1 for non-array JSON input, got $EXIT"
+            cat "$OUTPUT"
+            exit 1
+          fi
+          grep -q "must be a valid JSON array" "$OUTPUT"
+          rm -f "$OUTPUT"
