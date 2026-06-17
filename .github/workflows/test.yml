@@ -120,6 +120,12 @@ jobs:
             -out "$FIXTURES_DIR/multi_valid.pem" -days 365 -nodes \
             -subj "/CN=multi.example.com" 2>/dev/null
 
+          # Expiring-soon cert sharing a subject with multi_valid.pem, used to
+          # prove fail_on_warn does not fail when a newer valid replacement exists.
+          openssl req -x509 -newkey rsa:2048 -keyout /dev/null \
+            -out "$FIXTURES_DIR/multi_expiring.pem" -days 10 -nodes \
+            -subj "/CN=multi.example.com" 2>/dev/null
+
           echo "Fixtures generated:"
           ls -la "$FIXTURES_DIR"/*.pem
 
@@ -221,16 +227,18 @@ jobs:
           grep -q "Expiring Soon" "$SUMMARY"
           rm -f "$SUMMARY"
 
-      - name: 'Test: fail_on_warn does not fail valid certificate'
+      - name: 'Test: fail_on_warn does not fail when expiring cert has valid replacement'
         shell: bash
         run: |
           SUMMARY=$(mktemp)
-          INPUT_CERTIFICATES='["tests/fixtures/valid.pem"]' \
+          INPUT_CERTIFICATES='["tests/fixtures/multi_expiring.pem", "tests/fixtures/multi_valid.pem"]' \
           INPUT_WARNING_DAYS=30 \
           INPUT_FAIL_ON_WARN=true \
           GITHUB_STEP_SUMMARY="$SUMMARY" \
             bash validate.sh
-          grep -q "✅ Valid" "$SUMMARY"
+          # Must NOT fail (newer valid replacement exists, so WARN_COUNT stays 0),
+          # and the summary status must reflect the nearing-expiry cert.
+          grep -q "Expiring Soon (newer replacement exists)" "$SUMMARY"
           rm -f "$SUMMARY"
 
       - name: 'Test: invalid JSON input'
