@@ -17,10 +17,19 @@
 
 set -uo pipefail
 
+# -------------------------------------------------------
+# Tool availability check — fail fast with a clear message
+# -------------------------------------------------------
+for tool in openssl jq; do
+  if ! command -v "$tool" &>/dev/null; then
+    echo "::error::Required tool '$tool' is not installed on this runner."
+    exit 1
+  fi
+done
+
 INPUT_CERTIFICATES="${INPUT_CERTIFICATES:?'INPUT_CERTIFICATES environment variable is required'}"
 INPUT_WARNING_DAYS="${INPUT_WARNING_DAYS:-30}"
 INPUT_FAIL_ON_WARN="${INPUT_FAIL_ON_WARN:-false}"
-GITHUB_STEP_SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
 GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/null}"
 
 FAIL_ON_WARN="${INPUT_FAIL_ON_WARN,,}"
@@ -29,8 +38,8 @@ if [[ "$FAIL_ON_WARN" != "true" && "$FAIL_ON_WARN" != "false" ]]; then
   exit 1
 fi
 
-if [[ ! "$INPUT_WARNING_DAYS" =~ ^[0-9]+$ ]]; then
-  echo "::error::INPUT_WARNING_DAYS must be a non-negative integer, got: '$INPUT_WARNING_DAYS'"
+if ! [[ "$INPUT_WARNING_DAYS" =~ ^[0-9]+$ ]] || [[ "$((10#$INPUT_WARNING_DAYS))" -eq 0 ]]; then
+  echo "::error::warning_days must be a positive integer, got: '$INPUT_WARNING_DAYS'"
   exit 1
 fi
 
@@ -260,28 +269,30 @@ echo ""
 # -------------------------------------------------------
 # Write summary to GitHub Step Summary for a nice UI table
 # -------------------------------------------------------
-{
-  echo "## 🔐 Certificate Validation Summary"
-  echo ""
-  echo "| Certificate | Status |"
-  echo "|-------------|--------|"
-  for row in "${SUMMARY_ROWS[@]}"; do
-    echo "$row"
-  done
-  echo ""
-  if [[ $FAIL_COUNT -gt 0 ]]; then
-    echo "> ❌ **$FAIL_COUNT certificate(s) FAILED validation with no valid replacement.**"
-  elif [[ $WARN_COUNT -gt 0 ]]; then
-    echo "> ⚠️ **$WARN_COUNT certificate(s) are nearing expiry with no newer replacement.**"
-  else
-    echo "> ✅ **All certificate(s) are valid (or have valid replacements).**"
-  fi
-  echo ""
-  echo "| Metric | Count |"
-  echo "|--------|-------|"
-  echo "| Failed | $FAIL_COUNT |"
-  echo "| Warnings | $WARN_COUNT |"
-} >> "$GITHUB_STEP_SUMMARY"
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  {
+    echo "## 🔐 Certificate Validation Summary"
+    echo ""
+    echo "| Certificate | Status |"
+    echo "|-------------|--------|"
+    for row in "${SUMMARY_ROWS[@]}"; do
+      echo "$row"
+    done
+    echo ""
+    if [[ $FAIL_COUNT -gt 0 ]]; then
+      echo "> ❌ **$FAIL_COUNT certificate(s) FAILED validation with no valid replacement.**"
+    elif [[ $WARN_COUNT -gt 0 ]]; then
+      echo "> ⚠️ **$WARN_COUNT certificate(s) are nearing expiry with no newer replacement.**"
+    else
+      echo "> ✅ **All certificate(s) are valid (or have valid replacements).**"
+    fi
+    echo ""
+    echo "| Metric | Count |"
+    echo "|--------|-------|"
+    echo "| Failed | $FAIL_COUNT |"
+    echo "| Warnings | $WARN_COUNT |"
+  } >> "$GITHUB_STEP_SUMMARY"
+fi
 
 # -------------------------------------------------------
 # Emit outputs for programmatic use

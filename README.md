@@ -178,6 +178,8 @@ See the [`examples/`](examples/) directory for ready-to-use workflow files.
 ## Requirements
 
 - Runner must have `openssl` and `jq` installed (both are available by default on `ubuntu-latest` and `macos-latest` GitHub-hosted runners)
+- The action checks for both tools at startup and exits with a clear `::error::` message if either is missing
+- Safe to run locally or with [`act`](https://github.com/nektos/act): when `GITHUB_STEP_SUMMARY` is unset the Step Summary block is silently skipped — all other output and exit codes remain stable
 
 ---
 
