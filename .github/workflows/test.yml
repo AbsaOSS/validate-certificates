@@ -272,3 +272,48 @@ jobs:
           fi
           grep -q "must be a valid JSON array" "$OUTPUT"
           rm -f "$OUTPUT"
+
+      - name: 'Test: warning_days non-integer value'
+        shell: bash
+        run: |
+          OUTPUT=$(mktemp)
+          EXIT=0
+          INPUT_CERTIFICATES='["tests/fixtures/valid.pem"]' \
+          INPUT_WARNING_DAYS=abc \
+            bash validate.sh > "$OUTPUT" 2>&1 || EXIT=$?
+          if [[ "$EXIT" -ne 1 ]]; then
+            echo "::error::Expected exit code 1 for non-integer warning_days, got $EXIT"
+            cat "$OUTPUT"
+            exit 1
+          fi
+          grep -q "positive integer" "$OUTPUT"
+          rm -f "$OUTPUT"
+
+      - name: 'Test: warning_days zero'
+        shell: bash
+        run: |
+          OUTPUT=$(mktemp)
+          EXIT=0
+          INPUT_CERTIFICATES='["tests/fixtures/valid.pem"]' \
+          INPUT_WARNING_DAYS=0 \
+            bash validate.sh > "$OUTPUT" 2>&1 || EXIT=$?
+          if [[ "$EXIT" -ne 1 ]]; then
+            echo "::error::Expected exit code 1 for warning_days=0, got $EXIT"
+            cat "$OUTPUT"
+            exit 1
+          fi
+          grep -q "positive integer" "$OUTPUT"
+          rm -f "$OUTPUT"
+
+      - name: 'Test: GITHUB_STEP_SUMMARY unset'
+        shell: bash
+        run: |
+          EXIT=0
+          ( unset GITHUB_STEP_SUMMARY
+            INPUT_CERTIFICATES='["tests/fixtures/valid.pem"]' \
+            INPUT_WARNING_DAYS=30 \
+              bash validate.sh ) || EXIT=$?
+          if [[ "$EXIT" -ne 0 ]]; then
+            echo "::error::Expected exit code 0 when GITHUB_STEP_SUMMARY is unset, got $EXIT"
+            exit 1
+          fi
